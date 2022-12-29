@@ -36,25 +36,26 @@ handler.setFormatter(formatter)
 
 
 def check_tokens():
-    """Environment variables validation"""
+    """Environment variables validation."""
     if None in [PRACTICUM_TOKEN, TELEGRAM_TOKEN, TELEGRAM_CHAT_ID]:
         logger.critical('Please check variables are configured in .env')
         raise InvalidTokens('Please check variables are configured in .env')
 
 
 def send_message(bot, message):
-    """Send status update"""
+    """Send status update."""
     try:
         bot.send_message(TELEGRAM_CHAT_ID, message)
     except Exception as error:
         logger.error(f'Failure of telegram send_message with error{error}')
     else:
         logger.debug(
-            f'Message \"{message}\" was sent from bot to chat {TELEGRAM_CHAT_ID}')
+            f'Message \"{message}\" was sent from bot to chat '
+            f'{TELEGRAM_CHAT_ID}')
 
 
 def get_api_answer(timestamp):
-    """Yandex API answer retrieval function"""
+    """Yandex API answer retrieval function."""
     payload = {'from_date': timestamp}
     try:
         homework_statuses = requests.get(ENDPOINT, headers=HEADERS,
@@ -73,7 +74,7 @@ def get_api_answer(timestamp):
 
 
 def check_response(response):
-    """API response validation based on documentation"""
+    """API response validation based on documentation."""
     if not isinstance(response, dict):
         logger.error('Response data format is not dictionary')
         raise TypeError('Response data format is not dictionary')
@@ -91,7 +92,7 @@ def check_response(response):
 
 
 def parse_status(homework):
-    """Check homework status from API response"""
+    """Check homework status from API response."""
     if homework['status'] not in HOMEWORK_VERDICTS.keys():
         logger.error('Please validate status in response is based on '
                      'yandex documentation')
@@ -108,7 +109,7 @@ def parse_status(homework):
 
 
 def main():
-    """Yandex-practicum homework status changes telegram notification ."""
+    """Yandex-practicum homework status changes telegram notification."""
     check_tokens()
     bot = telegram.Bot(token=TELEGRAM_TOKEN)
     timestamp = int(time.time()) - LAST_DAY_OFFSET
