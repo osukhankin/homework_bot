@@ -30,7 +30,7 @@ HOMEWORK_VERDICTS = {
 logger = logging.getLogger(__name__)
 handler = logging.StreamHandler(stream=sys.stdout)
 file_handler = RotatingFileHandler(
-    os.path.join(BASE_DIR, 'logs', 'homework_bot.log'), maxBytes=1000000,
+    os.path.join(BASE_DIR, 'homework_bot.log'), maxBytes=1000000,
     backupCount=5)
 logger.addHandler(handler)
 logger.addHandler(file_handler)
