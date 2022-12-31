@@ -141,7 +141,7 @@ def parse_status(homework):
 def main():
     """Yandex-practicum homework status changes telegram notification."""
     if not check_tokens():
-        logger.critical(f'Пожалуйста, проверьте переменные окружения')
+        logger.critical('Пожалуйста, проверьте переменные окружения')
         raise InvalidTokens('Please check variables are configured in .env')
     bot = telegram.Bot(token=TELEGRAM_TOKEN)
     timestamp = 0
@@ -165,10 +165,10 @@ def main():
                     last_homework_name)
             else:
                 current_report['message_output'] = 'Обновлений нет'
-            if current_report != prev_report:
-                if send_message(bot, current_report['message_output']) is True:
-                    prev_report = current_report.copy()
-                    timestamp = response.get('current_date')
+            if (current_report != prev_report and
+                    send_message(bot, current_report['message_output'])):
+                prev_report = current_report.copy()
+                timestamp = response.get('current_date')
             else:
                 logger.debug('Обновлений нет')
         except ResponseFormatFailure as error:
@@ -177,9 +177,9 @@ def main():
             message = f'Сбой в работе программы: {error}'
             current_report['message_output'] = message
             logger.error(message)
-            if current_report != prev_report:
-                if send_message(bot, current_report['message_output']) is True:
-                    prev_report = current_report.copy()
+            if (current_report != prev_report and
+                    send_message(bot, current_report['message_output'])):
+                prev_report = current_report.copy()
         finally:
             time.sleep(RETRY_PERIOD)
 
