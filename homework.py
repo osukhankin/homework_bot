@@ -14,6 +14,7 @@ from exceptions import (EndpointFailureResponseCodes, InvalidTokens,
 
 
 load_dotenv()
+# logging.basicConfig(level=logging.DEBUG)
 BASE_DIR = os.path.dirname(__file__)
 PRACTICUM_TOKEN = os.getenv('PRACTICUM_TOKEN')
 TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN')
@@ -31,7 +32,7 @@ logger = logging.getLogger(__name__)
 handler = logging.StreamHandler(stream=sys.stdout)
 file_handler = RotatingFileHandler(
     os.path.join(BASE_DIR, 'homework_bot.log'), maxBytes=1000000,
-    backupCount=5)
+    backupCount=5, encoding='utf-8')
 logger.addHandler(handler)
 logger.addHandler(file_handler)
 formatter = logging.Formatter(
@@ -51,7 +52,7 @@ def check_tokens():
     )
     temp_bool = True
     for name, value in env_vars:
-        if value is None:
+        if not value:
             logger.critical(f'Пожалуйста, укажите переменную {name} в .env')
             temp_bool = False
     return temp_bool
@@ -59,7 +60,7 @@ def check_tokens():
 
 def send_message(bot, message):
     """Send status update."""
-    logger.debug('Попытка отправить сообщение в чат бота')
+    logger.debug(f'Попытка отправить сообщение \"{message}\" в чат бота')
     try:
         bot.send_message(TELEGRAM_CHAT_ID, message)
     except telegram.error.TelegramError as error:
@@ -74,20 +75,15 @@ def send_message(bot, message):
 
 def get_api_answer(timestamp):
     """Yandex API answer retrieval function."""
-    # payload = {'from_date': timestamp}
-    url_params = {
-        'EP': ENDPOINT,
-        'HD': HEADERS,
-        'PL': {'from_date': timestamp},
-    }
-    logger.debug('Попытка запроса статуса домашней работы: '
-                 'URL = {EP}, '
-                 'HEADERS = {HD}, '
-                 'PAYLOAD = {PL}, '.format(**url_params))
+    url_params = (ENDPOINT, HEADERS, {'from_date': timestamp})
+    ep, hd, pl = url_params
+    logger.debug(f'Попытка запроса статуса домашней работы: '
+                 f'URL = {ep}, '
+                 f'HEADERS = {hd}, '
+                 f'PAYLOAD = {pl}, ')
+
     try:
-        homework_statuses = requests.get(url_params['EP'],
-                                         headers=url_params['HD'],
-                                         params=url_params['PL'])
+        homework_statuses = requests.get(ep, headers=hd, params=pl)
         if homework_statuses.status_code != http.HTTPStatus.OK:
             raise EndpointFailureResponseCodes(
                 f'Please check why API response failed = '
@@ -96,12 +92,14 @@ def get_api_answer(timestamp):
                 f'text: {homework_statuses.text}')
         return homework_statuses.json()
     except requests.RequestException as error:
-        logger.error(error)
-        raise ConnectionError('Ошибка соединения при попыткы запроса '
-                              'статуса домашней работы: '
-                              'URL = {EP}, '
-                              'HEADERS = {HD}, '
-                              'PAYLOAD = {PL}, '.format(**url_params))
+        raise ConnectionError(
+            f'Ошибка "{error}" соединения при попыткы запроса  '
+            f'статуса домашней работы: '
+            f'URL = {ep}, '
+            f'HEADERS = {hd}, '
+            f'PAYLOAD = {pl}, ')
+    except Exception as error:
+        raise Exception(f'Ошибка "{error}"')
 
 
 def check_response(response):
@@ -133,7 +131,7 @@ def parse_status(homework):
         logger.error('Проверьте, что ключ homework_name приходит в ответе')
         raise ResponseFormatFailure(
             'Please validate homework_name exist in response')
-    homework_name = homework['homework_name']
+    homework_name = homework.get('homework_name')
     verdict = HOMEWORK_VERDICTS[status]
     return f'Изменился статус проверки работы "{homework_name}". {verdict}'
 
@@ -146,29 +144,29 @@ def main():
     bot = telegram.Bot(token=TELEGRAM_TOKEN)
     timestamp = 0
     current_report = {
-        'homework_name': '',
+        'homeworks_list': '',
         'message_output': '',
     }
     prev_report = {
-        'homework_name': '',
+        'homeworks_list': '',
         'message_output': '',
     }
 
     while True:
         try:
             response = get_api_answer(timestamp)
-            homework_name = check_response(response)
-            current_report['homework_name'] = homework_name
-            if homework_name:
-                last_homework_name = homework_name[0]
+            homeworks_list = check_response(response)
+            if homeworks_list:
+                last_homework_name = homeworks_list[0]
                 current_report['message_output'] = parse_status(
                     last_homework_name)
+                current_report['homeworks_list'] = homeworks_list
             else:
                 current_report['message_output'] = 'Обновлений нет'
             if (current_report != prev_report
                     and send_message(bot, current_report['message_output'])):
                 prev_report = current_report.copy()
-                timestamp = response.get('current_date')
+                timestamp = response.get('current_date', 0)
             else:
                 logger.debug('Обновлений нет')
         except ResponseFormatFailure as error:
@@ -176,9 +174,8 @@ def main():
         except Exception as error:
             message = f'Сбой в работе программы: {error}'
             current_report['message_output'] = message
-            logger.error(message)
-            if (current_report != prev_report
-                    and send_message(bot, current_report['message_output'])):
+            logger.error(message, exc_info=True)
+            if current_report != prev_report:
                 prev_report = current_report.copy()
         finally:
             time.sleep(RETRY_PERIOD)
