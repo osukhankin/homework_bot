@@ -14,7 +14,6 @@ from exceptions import (EndpointFailureResponseCodes, InvalidTokens,
 
 
 load_dotenv()
-# logging.basicConfig(level=logging.DEBUG)
 BASE_DIR = os.path.dirname(__file__)
 PRACTICUM_TOKEN = os.getenv('PRACTICUM_TOKEN')
 TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN')
@@ -60,7 +59,7 @@ def check_tokens():
 
 def send_message(bot, message):
     """Send status update."""
-    logger.debug(f'Попытка отправить сообщение \"{message}\" в чат бота')
+    logger.info(f'Попытка отправить сообщение \"{message}\" в чат бота')
     try:
         bot.send_message(TELEGRAM_CHAT_ID, message)
     except telegram.error.TelegramError as error:
@@ -75,15 +74,21 @@ def send_message(bot, message):
 
 def get_api_answer(timestamp):
     """Yandex API answer retrieval function."""
-    url_params = (ENDPOINT, HEADERS, {'from_date': timestamp})
-    ep, hd, pl = url_params
-    logger.debug(f'Попытка запроса статуса домашней работы: '
-                 f'URL = {ep}, '
-                 f'HEADERS = {hd}, '
-                 f'PAYLOAD = {pl}, ')
+    params = {'from_date': timestamp}
+    request_params = {
+        'url': ENDPOINT,
+        'headers': HEADERS,
+        'params': params
+    }
+    logger.info(
+        (
+            'Начинаем подключение к эндпоинту {url}, с параметрами'
+            ' headers = {headers} ;params= {params}.'
+        ).format(**request_params)
+    )
 
     try:
-        homework_statuses = requests.get(ep, headers=hd, params=pl)
+        homework_statuses = requests.get(**request_params)
         if homework_statuses.status_code != http.HTTPStatus.OK:
             raise EndpointFailureResponseCodes(
                 f'Please check why API response failed = '
@@ -91,15 +96,13 @@ def get_api_answer(timestamp):
                 f'reason:{homework_statuses.reason}, '
                 f'text: {homework_statuses.text}')
         return homework_statuses.json()
-    except requests.RequestException as error:
+    except Exception as error:
         raise ConnectionError(
             f'Ошибка "{error}" соединения при попыткы запроса  '
-            f'статуса домашней работы: '
-            f'URL = {ep}, '
-            f'HEADERS = {hd}, '
-            f'PAYLOAD = {pl}, ')
-    except Exception as error:
-        raise Exception(f'Ошибка "{error}"')
+            'статуса домашней работы c параметрами: '
+            'url = {url}, '
+            'headers = {headers}, '
+            'params = {params}, '.format(**request_params))
 
 
 def check_response(response):
@@ -122,13 +125,10 @@ def parse_status(homework):
     """Check homework status from API response."""
     status = homework.get('status')
     if status not in HOMEWORK_VERDICTS:
-        logger.error('Проверьте, что присланный статус '
-                     'соответствует документации')
         raise WrongStatusInResponse(
             f'Please validate status - "{status}" in response is based on '
             'yandex documentation')
     if 'homework_name' not in homework:
-        logger.error('Проверьте, что ключ homework_name приходит в ответе')
         raise ResponseFormatFailure(
             'Please validate homework_name exist in response')
     homework_name = homework.get('homework_name')
@@ -166,7 +166,7 @@ def main():
             if (current_report != prev_report
                     and send_message(bot, current_report['message_output'])):
                 prev_report = current_report.copy()
-                timestamp = response.get('current_date', 0)
+                timestamp = response.get('current_date', timestamp)
             else:
                 logger.debug('Обновлений нет')
         except ResponseFormatFailure as error:
