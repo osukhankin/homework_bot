@@ -144,11 +144,9 @@ def main():
     bot = telegram.Bot(token=TELEGRAM_TOKEN)
     timestamp = 0
     current_report = {
-        'homeworks_list': '',
         'message_output': '',
     }
     prev_report = {
-        'homeworks_list': '',
         'message_output': '',
     }
 
@@ -160,13 +158,12 @@ def main():
                 last_homework_name = homeworks_list[0]
                 current_report['message_output'] = parse_status(
                     last_homework_name)
-                current_report['homeworks_list'] = homeworks_list
             else:
                 current_report['message_output'] = 'Обновлений нет'
-            if (current_report != prev_report
-                    and send_message(bot, current_report['message_output'])):
-                prev_report = current_report.copy()
-                timestamp = response.get('current_date', timestamp)
+            if current_report != prev_report:
+                if send_message(bot, current_report['message_output']):
+                    prev_report = current_report.copy()
+                    timestamp = response.get('current_date', timestamp)
             else:
                 logger.debug('Обновлений нет')
         except ResponseFormatFailure as error:
