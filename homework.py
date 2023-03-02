@@ -173,6 +173,7 @@ def main():
             current_report['message_output'] = message
             logger.error(message, exc_info=True)
             if current_report != prev_report:
+                send_message(bot, current_report['message_output'])
                 prev_report = current_report.copy()
         finally:
             time.sleep(RETRY_PERIOD)
